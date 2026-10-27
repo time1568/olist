@@ -179,9 +179,6 @@ python run_pipeline.py
 4. **Feature Engineering (`3_feature_engineering.py`):** Executes SQL window functions to resolve primary seller states deterministically, computes order-level logistics ratios, and caches `training_features.csv`.
 5. **Validation Tuning & Testing (`4_train_model.py`):** Partitions data chronologically (70/15/15), selects the optimal tree ensemble size on the validation set (300 trees), and produces unbiased holdout test scores and top-decile metrics.
 6. **SHAP Attribution (`5_shap_analysis.py`):** Fits TreeExplainer to the holdout test set, outputs ranked mean absolute SHAP values, and exports `deliverables/shap_summary_plot.png`.
-
-> **Windows 1-Click Alternative:** You can also double-click `run_pipeline.bat` from File Explorer to execute the entire end-to-end pipeline in a single click.
-
 ---
 
 ### Step-by-Step Manual Execution (Optional)
