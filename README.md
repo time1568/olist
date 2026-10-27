@@ -3,9 +3,9 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Database SQLite](https://img.shields.io/badge/database-SQLite-lightgrey.svg)](https://www.sqlite.org/)
 [![Model LightGBM](https://img.shields.io/badge/model-LightGBM-brightgreen.svg)](https://lightgbm.readthedocs.io/)
-[![Explainability SHAP](https://img.shields.io/badge/explainability-SHAP-orange.svg)](https://shap.readthedocs.io/)
+[![Dataset Kaggle](https://img.shields.io/badge/Kaggle-Olist%20Dataset-20BEFF.svg)](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
 
-A production-grade Business Analytics & Applied Machine Learning project built on the **Olist Brazilian E-Commerce dataset** (~96.5K delivered orders).
+A production-grade Business Analytics & Applied Machine Learning project built on the [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) (~96.5K delivered orders).
 
 This repository bridges technical data engineering, leak-free temporal machine learning validation, and business translation. It quantifies the customer satisfaction impact of fulfillment failures, constructs an early-warning dispatch risk model, validates performance on a chronological holdout, and delivers concrete Agile specifications and an illustrative Cost-Benefit Analysis for operational deployment.
 
@@ -57,7 +57,7 @@ All 14 features use data strictly known at purchase completion:
 * **Deterministic Primary Seller Selection:** Uses `ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY COUNT(*) DESC, SUM(price) DESC)` to resolve the primary seller state deterministically for multi-item orders.
 * **Logistics & Routing:** `is_interstate` (seller state $\ne$ customer destination state), `total_freight`, `freight_to_price_ratio`.
 * **Platform Transit Window:** `estimated_delivery_days` (the promised calendar delivery window calculated at checkout).
-* **Physical Cargo Dimensions:** Average item weight (`avg_product_weight_g`) and cubic volume (`avg_product_volume_cm3`).
+* **Physical Package Bulk:** Average item weight (`avg_product_weight_g`) and cubic dimensions (`avg_product_volume_cm3`).
 * **Cart Complexity:** `total_items`, `total_sellers`, `total_order_value`.
 * **Temporal Indicators:** `purchase_month`, `purchase_dayofweek`, `purchase_hour`.
 
@@ -66,7 +66,7 @@ All 14 features use data strictly known at purchase completion:
 ## Model Training & Out-of-Time Validation
 
 ### Chronological 3-Way Split Structure
-To simulate real-world production conditions and prevent cross-temporal leakage:
+To simulate real-world production performance and avoid cross-temporal data leakage:
 * **Train Set (70% | 67,517 orders):** September 15, 2016 – April 15, 2018 (Baseline late rate: 9.03%)
 * **Validation Set (15% | 14,468 orders):** April 15, 2018 – June 21, 2018 (Baseline late rate: 5.34%)
 * **Test Holdout (15% | 14,469 orders):** June 21, 2018 – August 29, 2018 (Baseline late rate: 6.61%)
@@ -87,7 +87,7 @@ To prevent test-set overfitting, candidate ensemble sizes were tuned strictly on
 The 300-tree model was scored a single time on the untouched test holdout:
 
 * **ROC-AUC Score:** `0.7351`
-* **PR-AUC (Average Precision):** `0.1404` (vs. holdout baseline of `0.0661` — a **2.12× lift**)
+* **PR-AUC (Average Precision):** `0.1404` (vs. naive holdout baseline of `0.0661` — a **2.12× lift**)
 * **Top 10% Flagged Volume:** 1,446 orders out of 14,469 holdout orders
 * **Delays Captured in Top 10%:** 235 orders out of 957 total delays
 * **Top Decile Capture Rate:** **24.56%**
@@ -97,32 +97,30 @@ The 300-tree model was scored a single time on the untouched test holdout:
 
 ## Explainability & Root-Cause Analysis (SHAP)
 
-SHAP (`TreeExplainer`) analysis was computed on an out-of-time test holdout sample to isolate the key drivers associated with model delay probabilities.
+SHAP (`TreeExplainer`) feature attributions were calculated on a 2,000-order sample from the out-of-time test holdout (`5_shap_analysis.py`). The table below outlines all 14 engineered features ranked by global importance:
 
-### Ranked Feature Impact (Out-of-Time Test Sample)
-
-| Rank | Feature | Mean Absolute SHAP | Directional Influence & Interpretation |
+| Rank | Feature | Mean Absolute SHAP | Directional Effect on Delay Risk |
 | :---: | :--- | :---: | :--- |
-| **1** | `estimated_delivery_days` | 0.6388 | **Primary Operational Driver.** Shorter promised delivery windows compress transit slack, significantly increasing late-delivery probability. |
-| **2** | `purchase_month` | 0.6261 | **Seasonal Logistics Patterns.** Captures month-level delivery variance across the ~2 years of historical data. |
-| **3** | `customer_state` | 0.3485 | **Regional Destination Friction.** Remote states (e.g., MA, CE, BA, PA) face higher transit times from primary fulfillment hubs. |
-| **4** | `total_freight` | 0.1765 | Higher freight expenses correlate with long-haul, multi-carrier routes. |
-| **5** | `seller_state` | 0.1252 | Regional dispatch hub performance variations. |
-| **6** | `is_interstate` | 0.0752 | Cross-border shipments introduce routing handoffs and interstate transit friction. |
-| **7** | `total_items` | 0.0672 | Higher item count increases pick-pack dwell time. |
-| **8** | `avg_product_volume_cm3` | 0.0439 | Larger cargo occupies line-haul space, increasing consolidation wait times. |
-| **9** | `purchase_dayofweek` | 0.0403 | Orders placed near weekends encounter carrier non-operating windows. |
-| **10** | `avg_product_weight_g` | 0.0399 | Heavier parcels show higher transit dwell times. |
-| **11** | `total_order_value` | 0.0395 | Higher-tier purchases correlate with distinct product categories and handling. |
-| **12** | `total_sellers` | 0.0385 | Multi-seller carts require split consignments, multiplying delay risk. |
-| **13** | `freight_to_price_ratio` | 0.0348 | Ratio metric capturing shipping cost overhead relative to merchandise value. |
-| **14** | `purchase_hour` | 0.0263 | Time of day affects daily cutoff times for carrier fulfillment scans. |
+| 1 | `estimated_delivery_days` | **0.6388** | Shorter promised delivery windows correlate strongly with higher delay probability; longer promises absorb transit variance. |
+| 2 | `purchase_month` | **0.6261** | Reflects macro-seasonal transit variance across the historical baseline period. |
+| 3 | `customer_state` | **0.3485** | Destination states with weaker infrastructure (e.g., North/Northeast hubs like MA, CE, BA) show higher delay risk. |
+| 4 | `total_freight` | **0.1765** | High freight values correlate with long-haul, remote routing bottlenecks. |
+| 5 | `seller_state` | **0.1252** | Dispatches from secondary merchant clusters outside major logistics hubs (SP/RJ) correlate with line-haul dwell time. |
+| 6 | `is_interstate` | **0.0752** | Cross-state dispatches introduce handoff stages and multi-hub transfers compared to intrastate deliveries. |
+| 7 | `total_items` | **0.0672** | Multi-item carts add picking, packing, and consolidation friction at fulfillment centers. |
+| 8 | `avg_product_volume_cm3` | **0.0439** | Bulky parcels require specialized freight handling, increasing transit dwell risk. |
+| 9 | `purchase_dayofweek` | **0.0403** | Late-week purchases (Thursday/Friday) face weekend depot dwelling before long-haul dispatch. |
+| 10 | `avg_product_weight_g` | **0.0399** | Heavy freight experiences slower line-haul consolidation and manual handling delays. |
+| 11 | `total_order_value` | **0.0395** | High-value orders often correlate with complex items requiring enhanced carrier custody checks. |
+| 12 | `total_sellers` | **0.0385** | Split shipments from distinct merchant warehouses increase order fragmentation risk. |
+| 13 | `freight_to_price_ratio` | **0.0348** | Unfavorable freight economics reflect inefficient or highly distant carrier routes. |
+| 14 | `purchase_hour` | **0.0263** | Orders completed after carrier cutoff times face same-day manifest misses. |
 
 ---
 
 ## Business Impact: Illustrative Cost-Benefit Scenario
 
-*Disclaimer: The following financial scenario is an illustrative planning projection based on stated assumptions (50,000 annualized orders, $15 concession vouchers, and an assumed 35% delay resolution rate). It provides a structured framework for evaluating operational ROI.*
+*Disclaimer: The following financial projection is an illustrative planning scenario based on stated operational assumptions (50,000 annualized orders, $15 concession vouchers, and an assumed 35% delay resolution rate). It provides a structured business framework for evaluating proactive SLA interventions.*
 
 | Financial & Operational Metric | Baseline Operations | With Proposed Predictive SLA Engine | Net Delta |
 | :--- | :--- | :--- | :--- |
@@ -159,29 +157,46 @@ SHAP (`TreeExplainer`) analysis was computed on an out-of-time test holdout samp
 
 ---
 
-## Quickstart & Execution
+## Quickstart & Reproducibility
 
-### Prerequisites
-* Python 3.10+ (standard system Python; **no Conda required**)
-* Uncompressed Olist dataset CSV files placed inside the `data/` directory
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/olist-delivery-risk-engine.git
+cd olist-delivery-risk-engine
+```
 
-### 1-Command Execution (Terminal)
+### 2. Download the Dataset
+1. Download the [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) from Kaggle.
+2. Extract the uncompressed `.csv` files directly into the `data/` folder:
+   ```
+   data/
+   ├── olist_customers_dataset.csv
+   ├── olist_geolocation_dataset.csv
+   ├── olist_order_items_dataset.csv
+   ├── olist_order_payments_dataset.csv
+   ├── olist_order_reviews_dataset.csv
+   ├── olist_orders_dataset.csv
+   ├── olist_products_dataset.csv
+   ├── olist_sellers_dataset.csv
+   └── product_category_name_translation.csv
+   ```
 
-Clone the repository, navigate to the folder, and run the master orchestrator in your terminal:
+### 3. Run the Complete Pipeline
+Run the master orchestrator in your terminal (no Conda required):
 
 ```bash
 python run_pipeline.py
 ```
 
-### What `run_pipeline.py` Does Automatically:
-1. **Resolves Dependencies:** Checks `requirements.txt` and automatically installs or updates any missing packages via `pip`.
-2. **Step 1 (`1_load_db.py`):** Ingests raw CSVs into an indexed relational SQLite database (`olist.db`).
-3. **Step 2 (`2_audit_baseline.py`):** Runs deduplicated SQL queries to calculate baseline delay rates and CSAT drops.
-4. **Step 3 (`3_feature_engineering.py`):** Creates database join indexes and executes SQL window functions to extract all 14 features without leakage.
-5. **Step 4 (`4_train_model.py`):** Implements the 3-way temporal split, tunes ensemble size on the validation set, and evaluates out-of-time test metrics.
-6. **Step 5 (`5_shap_analysis.py`):** Computes SHAP attributions across holdout test records and exports ranked driver tables.
+*What `run_pipeline.py` executes automatically:*
+1. **Dependency Resolution:** Verifies `requirements.txt` and installs any missing libraries using `pip`.
+2. **Database Ingestion (`1_load_db.py`):** Loads the raw CSVs into an indexed SQLite database (`olist.db`).
+3. **Baseline Business Audit (`2_audit_baseline.py`):** Generates deduplicated CSAT impact and destination bottleneck audits.
+4. **Feature Engineering (`3_feature_engineering.py`):** Builds SQL window-function views and outputs `data/training_features.csv`.
+5. **Model Tuning & Evaluation (`4_train_model.py`):** Performs a chronological 3-way split, tunes tree counts on the validation set, and scores the holdout test set.
+6. **Explainability (`5_shap_analysis.py`):** Computes out-of-time TreeExplainer SHAP values and outputs feature attribution metrics.
 
-*(On Windows, you can also double-click `run_pipeline.bat` to launch this terminal command automatically.)*
+*(On Windows, you can also double-click `run_pipeline.bat` to launch the execution in a terminal window.)*
 
 ---
 
