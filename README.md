@@ -35,11 +35,11 @@ Delays are strongly associated with severe customer dissatisfaction. Rather than
 
 ## Data Architecture & Pipeline
 
-The pipeline is split into modular, self-contained Python scripts:
+The pipeline is split into modular, self-contained Python scripts orchestrated by a master runner:
 
 ```
-├── data/                                 # Raw CSVs & cached features (git-ignored)
-├── deliverables/
+├── data/                                 # Raw CSVs & cached features (git-ignored, .gitkeep tracked)
+├── deliverables/                         # Generated artifacts (.gitkeep tracked)
 │   ├── Olist_Project_Report.docx         # Complete executive & technical report
 │   └── shap_summary_plot.png             # Out-of-time SHAP summary visualization
 ├── 1_load_db.py                          # Ingests CSVs into indexed SQLite database
@@ -47,8 +47,10 @@ The pipeline is split into modular, self-contained Python scripts:
 ├── 3_feature_engineering.py              # Window-function SQL feature pipeline
 ├── 4_train_model.py                      # 3-way temporal split & validation tuning pipeline
 ├── 5_shap_analysis.py                    # Out-of-time TreeExplainer & feature attribution
-├── .gitignore                            # Production gitignore (excludes db, caches, envs)
+├── run_pipeline.py                       # 1-click master orchestrator & auto-dependency resolver
+├── run_pipeline.bat                      # Windows double-clickable execution script
 ├── requirements.txt                      # Reproducible library dependencies
+├── .gitignore                            # Production gitignore (excludes db, caches, CSVs)
 └── README.md
 ```
 
@@ -151,46 +153,47 @@ SHAP (`TreeExplainer`) analysis was computed on an out-of-time test holdout samp
 ## Getting Started & Reproduction
 
 ### Prerequisites
-* Python 3.10+
-* Conda or `venv` virtual environment
+* Python 3.9+ (Standard Python installation; **no Conda required**)
 
-### Installation
+### Installation & Dataset Setup
 1. Clone the repository:
    ```bash
    git clone https://github.com/your-username/olist-delivery-risk-engine.git
    cd olist-delivery-risk-engine
    ```
 
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2. Download the [Olist Brazilian E-Commerce Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) from Kaggle and place all uncompressed `.csv` files into the `data/` directory.
 
-3. Install required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Running the End-to-End Pipeline (1-Command Execution)
 
-4. Download the [Olist Brazilian E-Commerce Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) from Kaggle and place all uncompressed `.csv` files into the `data/` directory.
-
-### Running the End-to-End Pipeline
-Execute the scripts in order:
+Run the master orchestrator script directly in your terminal:
 
 ```bash
-# 1. Ingest raw CSVs into SQLite database
+python run_pipeline.py
+```
+
+*What `run_pipeline.py` does automatically:*
+1. **Dependency Verification:** Inspects `requirements.txt` and automatically installs or verifies any missing packages (`lightgbm`, `shap`, `pandas`, `scikit-learn`, `matplotlib`, `python-docx`) using `pip`.
+2. **Database Ingestion (`1_load_db.py`):** Loads all raw CSVs into an indexed relational SQLite database (`olist.db`).
+3. **Baseline Business Audit (`2_audit_baseline.py`):** Computes deduplicated order-level CSAT drops, 1-star distributions, and geographic risk concentrations.
+4. **Feature Engineering (`3_feature_engineering.py`):** Executes SQL window functions to resolve primary seller states deterministically, computes order-level logistics ratios, and caches `training_features.csv`.
+5. **Validation Tuning & Testing (`4_train_model.py`):** Partitions data chronologically (70/15/15), selects the optimal tree ensemble size on the validation set (300 trees), and produces unbiased holdout test scores and top-decile metrics.
+6. **SHAP Attribution (`5_shap_analysis.py`):** Fits TreeExplainer to the holdout test set, outputs ranked mean absolute SHAP values, and exports `deliverables/shap_summary_plot.png`.
+
+> **Windows 1-Click Alternative:** You can also double-click `run_pipeline.bat` from File Explorer to execute the entire end-to-end pipeline in a single click.
+
+---
+
+### Step-by-Step Manual Execution (Optional)
+If you prefer running individual stages manually instead of using `run_pipeline.py`:
+
+```bash
+pip install -r requirements.txt
+
 python 1_load_db.py
-
-# 2. Run deduplicated SQL baseline audits
 python 2_audit_baseline.py
-
-# 3. Create database indexes and extract feature view
 python 3_feature_engineering.py
-
-# 4. Tune ensemble size on validation set & evaluate holdout test set
 python 4_train_model.py
-
-# 5. Generate out-of-time SHAP summary plots and feature importance rankings
 python 5_shap_analysis.py
 ```
 
