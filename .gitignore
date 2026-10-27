@@ -1,19 +1,12 @@
-# ==============================================================================
-# Deliverables Folder
-# ==============================================================================
-# Ignore all generated deliverables, but keep folder tracked
-deliverables/*
-!deliverables/.gitkeep
-
-# ==============================================================================
-# Data & Database Files
-# ==============================================================================
-# Ignore all CSV files anywhere in data/
+# Data folder: ignore all CSVs, but keep .gitkeep
 data/*.csv
 data/**/*.csv
-
-# Keep data folder structure tracked
 !data/.gitkeep
+
+# Deliverables folder: ignore contents except .gitkeep
+deliverables/*
+!deliverables/
+!deliverables/.gitkeep
 
 # Ignore generated SQLite database
 olist.db
